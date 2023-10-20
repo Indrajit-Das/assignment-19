@@ -1,133 +1,120 @@
-import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+
+export async function GET() {
+  const prisma = new PrismaClient();
+  try {
+    const users = await prisma.user.findMany(); 
+    const usersData = users.map((user) => ({
+      id: Number(user.id),
+      firstName: user.firstName,
+      middleName: user.middleName,
+      lastName: user.lastName,
+      mobile: user.mobile,
+      email: user.email,
+      password: user.password,
+      admin: user.admin,
+      registeredAt: user.registeredAt,
+      lastLoginAt: user.lastLoginAt,
+      createAt: user.createAt,
+      updateAt: user.updateAt
+    }));
+
+    return NextResponse.json({ data: usersData });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    await prisma.$disconnect();
+    return NextResponse.json({
+      status: "Error",
+      message: "Failed to fetch users",
+      error: error.message,
+      statusCode: 500,
+    });
+  }
+}
 
 export async function POST(req, res) {
-  try {
-    const prisma = new PrismaClient();
-    
-    const result = await prisma.user.createMany({
-      data: [
-        {
-          firstName: "milon",
-          middlename: "chandro",
-          lastName: "roy",
-          mobile: "017764653149",
-          email: "milon@gmail.com",
-          password: "123456",
-          admin: true,
-        },
-
-        {
-          firstName: "joy",
-          middlename: "chandro",
-          lastName: "roy",
-          mobile: "017764653149",
-          email: "joy@gmail.com",
-          password: "123456",
-          admin: true,
-        },
-      ],
-    });
-
-    return NextResponse.json({
-      status: "success",
-      data: result,
-    });
-  } catch (error) {
-    return NextResponse.json({
-      status: "error",
-      message: error.message,
-    });
-  }
-}
-
-// Transcation Rollback
-try {
   const prisma = new PrismaClient();
 
-  const createUser = prisma.user.create({
-      data:{email:"sumon@gmail.com", password:"123"}
-  })
-
-  const product=prisma.product.delete({
-      where:{id:5}
-  })
-
-  const result=await prisma.$transaction([createUser, product])
-
-  console.log(result)
-}
-catch (e) {
-
-  console.log(e)
-}
-
-//   ☝ Read operation
-export const GET = async () => {
-  BigInt.prototype.toJSON = function () {
-    return this.toString();
-  };
   try {
-    const prisma = new PrismaClient();
-    const result = await prisma.user.findMany({});
-    return NextResponse.json({
-      status: "success",
-      data: result,
-    });
-  } catch (error) {
-    return NextResponse.json({
-      status: "failed",
-      data: error.message,
-    });
-  }
-};
-
-//   ☝ Update operation
-export const PUT = async (req, res) => {
-  try {
-    const prisma = new PrismaClient();
-    const { searchParams } = new URL(req.url);
-    const id = +searchParams.get("id");
-    const result = await prisma.user.update({
-      where: {
-        id: id,
-      },
+    const reqBody = await req.json();
+    await prisma.user.create({
       data: {
-        firstName: "updatedName",
-        middlename: "updated middlename",
-      },
+        firstName: reqBody.firstName,
+        middleName: reqBody.middleName,
+        lastName: reqBody.lastName,
+        mobile: reqBody.mobile,
+        email: reqBody.email,
+        admin: reqBody.admin,
+        password: reqBody.password,
+        registeredAt: new Date(),
+        lastLoginAt: new Date(),
+        createAt: new Date()
+      }
     });
-    return NextResponse.json({
-      status: "success",
-      data: result,
-    });
-  } catch (error) {
-    return NextResponse.json({
-      status: "failed",
-      data: error.message,
-    });
+    return NextResponse.json({status: "Success", message: "Successfully User Created",statusCode: 200});
+  } catch (error) { 
+    return NextResponse.json({ status: "Error", message: "Failed to create a new user", statusCode: 500});
+  } finally {
+    await prisma.$disconnect();
   }
-};
+}
 
-//   ☝ Delete operation
-export const DELETE = async (req, res) => {
+export async function PUT(req, res) {
+  const prisma = new PrismaClient();
+
   try {
-    const prisma = new PrismaClient();
-    const { searchParams } = new URL(req.url);
-    const id = +searchParams.get("id");
-    const result = await prisma.user.delete({
-      where: {
-        id: id,
-      },
+    const reqBody = await req.json();
+    await prisma.user.update({
+      where:{email: reqBody.email},
+      data: {
+        firstName: reqBody.firstName,
+        middleName: reqBody.middleName,
+        lastName: reqBody.lastName,
+        mobile: reqBody.mobile,
+        email: reqBody.email,
+        admin: reqBody.admin,
+        password: reqBody.password,
+        registeredAt: new Date(),
+        lastLoginAt: new Date(),
+        updateAt: new Date()
+      }
     });
     return NextResponse.json({
-      status: "success",
-      data: result,
+      status: "Success", 
+      message: "Successfully User Updated",
+      statusCode: 200
     });
-  } catch (error) {
+  } catch (error) { 
     return NextResponse.json({
-      status: "failed",
-      data: error.message,
+      status: "Error",
+      message: "Failed to update a new user", 
+      statusCode: 500,
+      error: error.message
     });
+  } finally {
+    await prisma.$disconnect();
   }
-};
+}
+
+export async function DELETE(req, res) {
+  const prisma = new PrismaClient();
+  const reqBody = await req.json();
+  try {
+    const deleteUser = await prisma.user.delete({
+      where:{id: reqBody.id}
+    });
+    
+    const deleteOrder = await prisma.order.delete({
+      where:{userId: reqBody.id}
+    });
+    
+    await prisma.$transaction([deleteUser, deleteOrder])
+    
+    return NextResponse.json({status: "Success", message: "Successfully User Deleted",statusCode: 200});
+  } catch (error) { 
+    return NextResponse.json({ status: "Error", message: "Failed to delete a new user", statusCode: 500});
+  } finally {
+    await prisma.$disconnect();
+  }
+}
